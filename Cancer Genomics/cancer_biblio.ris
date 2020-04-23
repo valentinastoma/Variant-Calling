@@ -1,0 +1,24 @@
+
+TY  - JOUR
+AU  - Tamborero, David
+ID  - Tamborero
+AU  - Gonzalez-Perez, Abel
+AU  - Lopez-Bigas, Nuria
+T1  - OncodriveCLUST: exploiting the positional clustering of somatic mutations to identify cancer genes
+PY  - 2013
+Y1  - 2013/07/31/
+DO  - 10.1093/bioinformatics/btt395
+JO  - Bioinformatics
+JA  - Bioinformatics
+VL  - 29
+IS  - 18
+SP  - 2238
+EP  - 2244
+SN  - 1367-4803
+AB  - Motivation: Gain-of-function mutations often cluster in specific protein regions, a signal that those mutations provide an adaptive advantage to cancer cells and consequently are positively selected during clonal evolution of tumours. We sought to determine the overall extent of this feature in cancer and the possibility to use this feature to identify drivers.Results: We have developed OncodriveCLUST, a method to identify genes with a significant bias towards mutation clustering within the protein sequence. This method constructs the background model by assessing coding-silent mutations, which are assumed not to be under positive selection and thus may reflect the baseline tendency of somatic mutations to be clustered. OncodriveCLUST analysis of the Catalogue of Somatic Mutations in Cancer retrieved a list of genes enriched by the Cancer Gene Census, prioritizing those with dominant phenotypes but also highlighting some recessive cancer genes, which showed wider but still delimited mutation clusters. Assessment of datasets from The Cancer Genome Atlas demonstrated that OncodriveCLUST selected cancer genes that were nevertheless missed by methods based on frequency and functional impact criteria. This stressed the benefit of combining approaches based on complementary principles to identify driver mutations. We propose OncodriveCLUST as an effective tool for that purpose.Availability: OncodriveCLUST has been implemented as a Python script and is freely available from http://bg.upf.edu/oncodriveclustContact:nuria.lopez@upf.edu or abel.gonzalez@upf.eduSupplementary information:Supplementary data are available at Bioinformatics online.
+Y2  - 4/12/2020
+UR  - https://doi.org/10.1093/bioinformatics/btt395
+ER  - 
+
+
+

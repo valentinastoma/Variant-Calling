@@ -1,0 +1,394 @@
+---
+title: "cancerGenomics"
+author: "Valentina Stoma"
+date: "4/11/2020"
+output: html_document
+bibliography: cancer_biblio.ris
+---
+
+Maftools only requires somatic variants in Mutation Annotation Format (MAF) and is independent of larger alignment files.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(library(maftools))
+
+```
+
+
+```{r}
+library(devtools)
+# install_github(repo = "PoisonAlien/maftools")
+library(maftools)
+```
+
+```{r}
+# BSgenome.Hsapiens.UCSC.hg19 package
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# BiocManager::install("BSgenome.Hsapiens.UCSC.hg19")
+# 
+# # NMF and pheatmap packages
+# install.packages(c("pheatmap", "NMF"))
+
+```
+## Data 
+```{r}
+#path to TCGA LAML MAF file
+laml.maf = system.file('extdata', 'tcga_laml.maf.gz', package = 'maftools') 
+#clinical information containing survival information and histology. This is optional
+laml.clin = system.file('extdata', 'tcga_laml_annot.tsv', package = 'maftools') 
+
+laml = read.maf(maf = laml.maf, clinicalData = laml.clin)
+```
+
+Accessing the information of the useful slots from MAF object [@Mayakonda]
+
+```{r}
+laml
+```
+
+```{r}
+#Shows sample summry.
+head(getSampleSummary(laml))
+```
+
+```{r}
+#Shows gene summary.
+head(getGeneSummary(laml))
+```
+
+Using 'head' for demonstation purposes in the kntited file and conservation of space. 
+
+```{r}
+#shows clinical data associated with samples
+head(getClinicalData(laml))
+```
+
+```{r}
+#Shows all fields in MAF
+getFields(laml)
+```
+
+```{r}
+#Writes maf summary to an output file with basename laml.
+write.mafSummary(maf = laml, basename = 'laml')
+```
+
+
+## Visualization 
+
+This section covers multiple visualization methods that one can perfrom with maftools. Specifically, plotmafSummary demonstrates number of variants in each sample as a stacked barplot and variant types as a boxplot summarized by Variant_Classification.
+
+```{r}
+plotmafSummary(maf = laml, rmOutlier = TRUE, addStat = 'median', dashboard = TRUE, titvRaw = FALSE)
+```
+
+### Drawing oncoplots 
+
+Oncoplots, or waterfall plots are also possible in maftools 
+
+```{r}
+#oncoplot for top ten mutated genes.
+oncoplot(maf = laml, top = 10)
+```
+
+### Oncostrip 
+
+Oncostrip is used to visualize a set of genes, with the color strips representing the mutations. 
+
+```{r}
+oncostrip(maf = laml, genes = c('DNMT3A','NPM1', 'RUNX1'))
+```
+
+### Transition and transversion 
+
+This titv function returns a summary of trasnversion and transition classified SNPs. Data can be presented as a bar plot as well. 
+
+```{r}
+
+laml.titv = titv(maf = laml, plot = FALSE, useSyn = TRUE)
+#plot titv summary
+plotTiTv(res = laml.titv)
+```
+### Lollipop plot 
+
+These plots can be used to visualize amoni acid changes, whic stands for the mutation spots on protein structure. Site preference for the mutation on the spot of the protein  can be mutational hot spots
+
+```{r}
+#lollipop plot for DNMT3A, which is one of the most frequent mutated gene in Leukemia.
+lollipopPlot(maf = laml, gene = 'DNMT3A', AACol = 'Protein_Change', showMutationRate = TRUE)
+```
+
+### Labelling points 
+
+We can label the plots iwth the amino acids - if everyhting is chosen, all points will be annotated. 
+
+```{r}
+lollipopPlot(maf = laml, gene = 'KIT', AACol = 'Protein_Change', labelPos = 816, refSeqID = 'NM_000222')
+
+```
+
+### Rainfall plots 
+Cancer genomes are charachterized by genomic loci with localized hypermutations.
+rainfall plots are used to visualize inter variant distance  on a linera genomic scale
+
+```{r}
+brca <- system.file("extdata", "brca.maf.gz", package = "maftools")
+brca = read.maf(maf = brca, verbose = FALSE)
+```
+
+```{r}
+rainfallPlot(maf = brca, detectChangePoints = TRUE, pointSize = 0.6)
+```
+
+### comparing mutation load against TCGA cohorts 
+TCGA contains over 30 different cancer cohorts and median mutation load across them varies from as low as 7 per exome. 
+tcgaCompare  draws distribution of variants compiled from over 10,000 WXS samples across 33 TCGA landmark cohorts [@Mayakonda]. 
+
+```{r}
+laml.mutload = tcgaCompare(maf = laml, cohortName = 'Example-LAML')
+```
+
+### Plotting VAF 
+
+```{r}
+plotVaf(maf = laml, vafCol = 'i_TumorVAF_WU')
+```
+
+### Genecloud 
+Visualization of the mutated genes - the size if proportional to the number of samples it is mutated in. 
+
+```{r}
+geneCloud(input = laml, minMut = 3)
+```
+
+## 9 - Analysis 
+  
+somaticInteractions function is used to  estimate co ocurring or mutually exclusive sets of genes through Fisher's exeact test [@Mayakonda]
+```{r}
+#exclusive/co-occurance event analysis on top 10 mutated genes. 
+somaticInteractions(maf = laml, top = 25, pvalue = c(0.05, 0.1))
+```
+
+### Detecting cancer driver genes based on positional clustering 
+oncodrive is based on algorithm oncodriveCLUST which was originally implemented in Python. Concept is based on the fact that most of the variants in cancer causing genes are enriched at few specific loci (aka hot-spots). This method takes advantage of such positions to identify cancer genes [@Tamborero]. 
+
+```{r}
+laml.sig = oncodrive(maf = laml, AACol = 'Protein_Change', minMut = 5, pvalMethod = 'zscore')
+head(laml.sig)
+```
+
+Size of the points proportional to the number of clusters found in the gene
+```{r}
+plotOncodrive(res = laml.sig, fdrCutOff = 0.1, useFraction = TRUE)
+```
+
+### Adding and summarizing pfam domains 
+
+Adds pfam domain information to the amino acid changes. 
+
+```{r}
+laml.pfam = pfamDomains(maf = laml, AACol = 'Protein_Change', top = 10)
+```
+
+```{r}
+#Protein summary (Printing first 7 columns for display convenience)
+head(laml.pfam$proteinSummary[,1:7, with = FALSE], 10)
+```
+
+```{r}
+#Domain summary (Printing first 3 columns for display convenience)
+head(laml.pfam$domainSummary[,1:3, with = FALSE], 15)
+```
+
+### Pan -Cancer comparison 
+
+
+```{r}
+#MutsigCV results for TCGA-AML
+laml.mutsig <- system.file("extdata", "LAML_sig_genes.txt.gz", package = "maftools")
+pancanComparison(mutsigResults = laml.mutsig, qval = 0.1, cohortName = 'LAML', inputSampleSize = 200, label = 1)
+```
+
+### Survival analysis 
+
+
+__Mutation in any given genes__
+
+Survival analysis is an essential part of cohort based sequencing projects.
+
+```{r}
+#Survival analysis based on grouping of DNMT3A mutation status
+mafSurvival(maf = laml, genes = 'DNMT3A', time = 'days_to_last_followup', Status = 'Overall_Survival_Status', isTCGA = TRUE)
+```
+
+__Predict genesets associated with survival__
+
+Identify set of genes which results in poor survival
+```{r}
+#Using top 20 mutated genes to identify a set of genes (of size 2) to predict poor prognostic groups
+prog_geneset = survGroup(maf = laml, top = 20, geneSetSize = 2, time = "days_to_last_followup", Status = "Overall_Survival_Status", verbose = FALSE)
+```
+```{r}
+print(prog_geneset)
+```
+Above results show a combination (N = 2) of genes which are associated with poor survival (P < 0.05). 
+```{r}
+mafSurvGroup(maf = laml, geneSet = c("DNMT3A", "FLT3"), time = "days_to_last_followup", Status = "Overall_Survival_Status")
+```
+
+### Comparing two cohorts
+
+Detecting the mutation pattern in order to compare nultiple cohorts 
+```{r}
+#Primary APL MAF
+primary.apl = system.file("extdata", "APL_primary.maf.gz", package = "maftools")
+primary.apl = read.maf(maf = primary.apl)
+#Relapse APL MAF
+relapse.apl = system.file("extdata", "APL_relapse.maf.gz", package = "maftools")
+relapse.apl = read.maf(maf = relapse.apl)
+```
+
+```{r}
+#Considering only genes which are mutated in at-least in 5 samples in one of the cohort to avoid bias due to genes mutated in single sample.
+pt.vs.rt <- mafCompare(m1 = primary.apl, m2 = relapse.apl, m1Name = 'Primary', m2Name = 'Relapse', minMut = 5)
+print(pt.vs.rt)
+```
+
+__Forest plots__
+Above results show two genes PML and RARA which are highly mutated in Relapse APL compared to Primary APL. We can visualize them.
+```{r}
+forestPlot(mafCompareRes = pt.vs.rt, pVal = 0.1, color = c('royalblue', 'maroon'), geneFontSize = 0.8)
+```
+
+__Co-onco plots__
+
+```{r}
+genes = c("PML", "RARA", "RUNX1", "ARID1B", "FLT3")
+coOncoplot(m1 = primary.apl, m2 = relapse.apl, m1Name = 'PrimaryAPL', m2Name = 'RelapseAPL', genes = genes, removeNonMutated = TRUE)
+```
+
+__Lollipop plots-2__
+
+Showing gene wise difference 
+```{r}
+lollipopPlot2(m1 = primary.apl, m2 = relapse.apl, gene = "PML", AACol1 = "amino_acid_change", AACol2 = "amino_acid_change", m1_name = "Primary", m2_name = "Relapse")
+```
+
+## Clinical enrichment analysis 
+
+takes in clinical features and performs enrichment analysis. 
+Various groupwise and pairwise comparison. 
+```{r}
+fab.ce = clinicalEnrichment(maf = laml, clinicalFeature = 'FAB_classification')
+```
+
+```{r}
+#Results are returned as a list. Significant associations p-value < 0.05
+fab.ce$groupwise_comparision[p_value < 0.05]
+```
+
+Above results shows IDH1 mutations are enriched in M1 subtype of leukemia compared to rest of the cohort. Similarly DNMT3A is in M5, RUNX1 is in M0
+```{r}
+plotEnrichmentResults(enrich_res = fab.ce, pVal = 0.05)
+```
+
+## Drug -Gene interaction 
+
+This plot shows potential druggable gene categories along with upto top 5 genes involved in them.
+```{r}
+dgi = drugInteractions(maf = laml, fontSize = 0.75)
+```
+
+```{r}
+dnmt3a.dgi = drugInteractions(genes = "DNMT3A", drugs = TRUE)
+```
+
+```{r}
+#Printing selected columns.
+dnmt3a.dgi[,.(Gene, interaction_types, drug_name, drug_claim_name)]
+```
+
+## Oncogenic signaling pathway 
+Check for enrichment of known ocogenic singaling pathways in TCGA cohorts/ 
+```{r}
+OncogenicPathways(maf = laml)
+```
+
+Complete pathway visualization 
+```{r}
+PlotOncogenicPathways(maf = laml, pathways = "RTK-RAS")
+```
+
+## Mutational Signatures 
+
+<!-- ```{r} -->
+<!-- #Requires BSgenome object -->
+<!-- library(BSgenome.Hsapiens.UCSC.hg19, quietly = TRUE) -->
+<!-- laml.tnm = trinucleotideMatrix(maf = laml, prefix = 'chr', add = TRUE, ref_genome = "BSgenome.Hsapiens.UCSC.hg19") -->
+<!-- ``` -->
+
+<!-- Analyze the differences in mutational patterns between APOBEC enriched and non-APOBEC enriched samples. -->
+
+<!-- ```{r} -->
+<!-- plotApobecDiff(tnm = laml.tnm, maf = laml, pVal = 0.2) -->
+<!-- ``` -->
+
+<!-- ### Signature analysis  -->
+<!-- ```{r} -->
+<!-- # encoutnered issues with parallel processing, neede to reinstall the following packages and and reload the libraries for NMF and foreach  -->
+<!-- #install.packages(c( "foreach", "doParallel") ) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- library(NMF) -->
+<!-- library(foreach) -->
+<!-- library(devtools) -->
+<!-- # #install.packages('car') -->
+<!-- # library(car) -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+
+<!-- laml.sign = estimateSignatures(mat = laml.tnm, nTry = 6, pConstant = 1) -->
+<!-- laml.sig = extractSignatures(mat = laml.tnm, n = 3, pConstant = 1) -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+<!-- #Compare against original 30 signatures  -->
+<!-- laml.og30.cosm = compareSignatures(nmfRes = laml.sig, sig_db = "legacy") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- #Compate against updated version3 60 signatures -->
+<!-- laml.v3.cosm = maftools::compareSignatures(nmfRes = laml.sig, sig_db = "SBS") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- library(pheatmap) -->
+<!-- pheatmap::pheatmap(mat = laml.og30.cosm$cosine_similarities, cluster_rows = FALSE, main = "cosine similarity against validated signatures") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- plotSignatures(nmfRes = laml.sig, title_size = 0.8) -->
+<!-- ``` -->
+
+
+<!-- ### Signature enrichment analysis  -->
+
+<!-- Signatures can further be assigned to samples and enrichment analysis can be performd using signatureEnrichment funtion, which identifies mutations enriched in every signature identified. -->
+
+<!-- ```{r} -->
+<!-- laml.se = signatureEnrichment(maf = laml, sig_res = laml.sig) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- plotEnrichmentResults(enrich_res = laml.se, pVal = 0.05) -->
+<!-- ``` -->
+
+
+## References:
+
